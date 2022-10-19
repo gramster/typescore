@@ -26,14 +26,14 @@ _skip = [
 def install(package) -> None:
     """ Run a pip install and wait for completion. Raise a CalledProcessError on failure. """
     if package not in _skip:
-        subprocess.run([sys.executable, "-m", "pip", "install", package, "--require-virtualenv"], check=True)
+        subprocess.run([sys.executable, "-m", "pip", "install", package, "--require-virtualenv"], capture_output=True, check=True)
 
 
 def uninstall(package) -> None:
     """ Run a pip uninstall and wait for completion. Raise a CalledProcessError on failure. """
     if package in _skip or package.endswith('-stubs'):
         return
-    subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", package], check=True)
+    subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", package], capture_output=True, check=True)
 
 
 def get_site_packages() -> str:
@@ -48,7 +48,8 @@ def get_toplevels(package) -> list[str]:
     """ Get the top-level modules associated with a package. """
     # See if there is a toplevel.txt file for the package
     site_packages = get_site_packages()
-    files = glob.glob(f'{site_packages}/{package}-*.dist-info/top-level.txt')
+    loc = f'{site_packages}/{package}-*.dist-info/top_level.txt'
+    files = glob.glob(loc)
     if len(files) == 1:
         with open(files[0]) as f:
             modmap_changed = True
