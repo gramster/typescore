@@ -21,8 +21,8 @@ Options:
   --version             Show the version.
 
 typescore uses pyright to score the typing completeness of a set of Python
-packages. It reads this list from <packages> and writes the results to
-<scorefile>. If errors prevent it from scoring a package it will set the
+packages. It reads this list from \<packages\> and writes the results to
+\<scorefile\>. If errors prevent it from scoring a package it will set the
 score to 0%.
 
 The output has the form:
