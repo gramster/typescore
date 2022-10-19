@@ -10,6 +10,7 @@ from importlib.metadata import version, metadata
 _skip = [
     'certifi',
     'charset-normalizer',
+    'distutils',
     'docopt',
     'docutils',
     'flit',
@@ -20,9 +21,11 @@ _skip = [
     'pip',
     'pyright',
     'requests',
+    'setuptools',
     'tomli',
     'tomli_w',
     'urllib3',
+    'wheel',
     'zipp',
 ]
 
@@ -66,7 +69,7 @@ def get_toplevels(package) -> list[str]:
     return [package]
                     
 
-def get_score(module) -> str:
+def get_score(package: str, module: str) -> str:
     tf = f'{get_site_packages()}/{module}/py.typed'
     if not os.path.exists(tf):
         with open(tf, 'w') as f:
@@ -78,14 +81,16 @@ def get_score(module) -> str:
         for line in s.stdout.split('\n'):
             l = line.strip()
             if l.startswith('error: Module'):
+                print(f'{package}/{module}: Scoring failed: {l}')
                 return '0%'
             elif l.startswith('Type completeness score'):
                 return l[l.rfind(' ')+1:]
     except Exception as e:
-        print(e)
+        print(f'{package}/{module}: Scoring failed: {e}')
     finally:
         if tf:
             os.remove(tf)
+    print(f'{package}/{module}: Scoring failed: No score line found')
     return '0%'
 
     
@@ -121,10 +126,27 @@ def compute_scores(packagesfile, scorefile, verbose=True, sep=','):
                         pass
     
                 for module in get_toplevels(package):
+                    hacky = False
+                    if os.path.exists(f'{site_packages}/{module}.py'):
+                        # We have to do some hoop jumping here to get around
+                        # pyright wanting a py.typed file before it will
+                        # allow --verifytypes to be used. We already cons
+                        # up a py.typed file if needed elsewhere, but we
+                        # need to convert the package to a folder-based one
+                        # temporarily here...
+                        os.mkdir(f'{site_packages}/{module}')
+                        os.rename(f'{site_packages}/{module}.py', f'{site_packages}/{module}/__init__.py')
+                        hacky = True
                     if os.path.exists(f'{site_packages}/{module}'):
-                        score = get_score(module)
+                        score = get_score(package, module)
                         of.write(f'{package}{ver}{sep}{typed}{sep}{module}{sep}{score}{description}{extra}\n')
-
+                    else:
+                        print(f'Package {package} module {module} not found in site packages')
+                    if hacky:
+                        os.rename(f'{site_packages}/{module}/__init__.py',
+                                  f'{site_packages}/{module}.py')
+                        os.rmdir(f'{site_packages}/{module}')
+                    
                 try:
                     uninstall(package)
                 except:
