@@ -28,14 +28,15 @@ score to 0%.
 The output has the form:
 
 
-    package,module,score,extra_columns
+    package,typed,module,score,extra_columns
 
 
 or, if --verbose is specified:
 
 
-    package,version,module,score,package_description,extra_columns
+    package,version,typed,module,score,package_description,extra_columns
 
+'typed' is a Boolean and tells whether the package had a py.typed file.
 
 Note: we only score top-level modules, not submodules. The assumption is
 that scores for top-level modules would be reasonably representative of

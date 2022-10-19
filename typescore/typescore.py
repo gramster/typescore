@@ -67,6 +67,12 @@ def get_toplevels(package) -> list[str]:
                     
 
 def get_score(module) -> str:
+    tf = f'{get_site_packages()}/{module}/py.typed'
+    if not os.path.exists(tf):
+        with open(tf, 'w') as f:
+            pass
+    else:
+        tf = None
     try:
         s = subprocess.run([sys.executable, "-m", "pyright", "--verifytypes", module], capture_output=True, text=True)
         for line in s.stdout.split('\n'):
@@ -77,26 +83,12 @@ def get_score(module) -> str:
                 return l[l.rfind(' ')+1:]
     except Exception as e:
         print(e)
-        pass
+    finally:
+        if tf:
+            os.remove(tf)
     return '0%'
 
     
-def process_package(package) -> dict[str, str]:
-    rtn = {}
-    try:
-        install(package)
-    except Exception as e:
-        print(f'Failed to install {package}: {e}')
-        return {}
-    for module in get_toplevels(package):
-        rtn[module] = get_score(module)
-    try:
-        uninstall(package)
-    except:
-        pass
-    return rtn
-
-
 def compute_scores(packagesfile, scorefile, verbose=True, sep=','):
     site_packages = get_site_packages()
     with open(packagesfile) as f:
@@ -114,25 +106,24 @@ def compute_scores(packagesfile, scorefile, verbose=True, sep=','):
                     print(f'Failed to install {package}: {e}')
                     continue
 
-                if not os.path.exists(f'{site_packages}/{package}/py.typed'):
-                    print(f'Package {package} has no py.typed file; skipping')
-                else:
-                    ver = ''
-                    description = ''
-                    if verbose:
-                        try:
-                            ver = sep + version(package)
-                            description = metadata(package)['Summary']
-                            if description.find(sep) >= 0:
-                                description = sep + '"' + description.replace('"', "'") + '"'
-                            else:
-                                description = sep + description
-                        except:
-                            pass
+                typed = os.path.exists(f'{site_packages}/{package}/py.typed')
+                ver = ''
+                description = ''
+                if verbose:
+                    try:
+                        ver = sep + version(package)
+                        description = metadata(package)['Summary']
+                        if description.find(sep) >= 0:
+                            description = sep + '"' + description.replace('"', "'") + '"'
+                        else:
+                            description = sep + description
+                    except:
+                        pass
     
-                    for module in get_toplevels(package):
+                for module in get_toplevels(package):
+                    if os.path.exists(f'{site_packages}/{module}'):
                         score = get_score(module)
-                        of.write(f'{package}{ver}{sep}{module}{sep}{score}{description}{extra}\n')
+                        of.write(f'{package}{ver}{sep}{typed}{sep}{module}{sep}{score}{description}{extra}\n')
 
                 try:
                     uninstall(package)
