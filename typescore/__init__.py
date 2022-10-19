@@ -32,7 +32,7 @@ the packages all-up.
 
 <packages> should have one package name per line. It can be a CSV file with
 the package name as the first column, in which case other columns will be
-included in the SCOREFILE output ('extra_columns'). A typical extra column
+included in the score file output ('extra_columns'). A typical extra column
 might be the package rank on PyPI downloads.
 """
 
