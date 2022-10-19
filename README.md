@@ -1,8 +1,11 @@
 typescore - generate typing completeness scores for a set of packages
 
 Usage:
+
   typescore \<packages\> [--verbose] [--scores \<scorefile\>] [--sep \<sep\>]
+
   typescore --help
+  
   typescore --version
 
 Options:
