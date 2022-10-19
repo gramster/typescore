@@ -39,7 +39,9 @@ or, if --verbose is specified:
 
 Note: we only score top-level modules, not submodules. The assumption is
 that scores for top-level modules would be reasonably representative of
-the packages all-up.
+the packages all-up. However, we do generate separate scores for each top
+level module in a package (so matplotlib would result in 3 lines, one each
+for 'matplotlib', 'mpl_toolkits' and 'pylab'.
 
 \<packages\> should have one package name per line. It can be a CSV file with
 the package name as the first column, in which case other columns will be
