@@ -1,15 +1,15 @@
 typescore - generate typing completeness scores for a set of packages
 
 Usage:
-  typescore <packages> [--verbose] [--scores <scorefile>] [--sep <sep>]
+  typescore \<packages\> [--verbose] [--scores \<scorefile\>] [--sep \<sep\>]
   typescore --help
   typescore --version
 
 Options:
 
-  --scores <scorefile>  The output file. [default: scores.csv]
+  --scores \<scorefile\>  The output file. [default: scores.csv]
 
-  --sep <sep>           CSV column separator. [default: ,]
+  --sep \<sep\>           CSV column separator. [default: ,]
 
   --verbose             Include package info in the output.
   
@@ -38,7 +38,7 @@ Note: we only score top-level modules, not submodules. The assumption is
 that scores for top-level modules would be reasonably representative of
 the packages all-up.
 
-<packages> should have one package name per line. It can be a CSV file with
+\<packages\> should have one package name per line. It can be a CSV file with
 the package name as the first column, in which case other columns will be
-included in the SCOREFILE output ('extra_columns'). A typical extra column
+included in the score file output ('extra_columns'). A typical extra column
 might be the package rank on PyPI downloads.
