@@ -1,3 +1,4 @@
+Package|Version|py.typed?|Module|Score|Desciption|PyPI Downloads
 boto3|1.24.93|False|boto3|0%|The AWS SDK for Python|376423964
 botocore|1.27.93|False|botocore|0%|Low-level, data-driven core of boto 3.|238905727
 urllib3|1.26.12|False|urllib3|21.9%|HTTP library with thread-safe connection pooling, file post, and more.|233856611
