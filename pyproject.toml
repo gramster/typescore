@@ -13,6 +13,7 @@ dependencies = [
     "docopt",
     "pip",
     "pyright",
+    "importlib-metadata",
 ]
 classifiers = ["Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",

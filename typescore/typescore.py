@@ -1,4 +1,5 @@
 import glob
+import os
 import subprocess
 import sys
 from importlib.metadata import version, metadata
@@ -14,12 +15,15 @@ _skip = [
     'flit',
     'flit_core',
     'idna',
+    'importlib-metadata',
     'nodeenv',
+    'pip',
     'pyright',
     'requests',
     'tomli',
     'tomli_w',
     'urllib3',
+    'zipp',
 ]
 
 
@@ -64,14 +68,15 @@ def get_toplevels(package) -> list[str]:
 
 def get_score(module) -> str:
     try:
-        s = subprocess.run([sys.executable, "-m", "pyright", "--", module], check=True, capture_output=True, text=True)
-        for line in s.stdout:
+        s = subprocess.run([sys.executable, "-m", "pyright", "--verifytypes", module], capture_output=True, text=True)
+        for line in s.stdout.split('\n'):
             l = line.strip()
             if l.startswith('error: Module'):
                 return '0%'
             elif l.startswith('Type completeness score'):
                 return l[l.rfind(' ')+1:]
-    except Exception:
+    except Exception as e:
+        print(e)
         pass
     return '0%'
 
@@ -93,6 +98,7 @@ def process_package(package) -> dict[str, str]:
 
 
 def compute_scores(packagesfile, scorefile, verbose=True, sep=','):
+    site_packages = get_site_packages()
     with open(packagesfile) as f:
         with open(scorefile, 'w') as of:
             for line in f:
@@ -107,23 +113,26 @@ def compute_scores(packagesfile, scorefile, verbose=True, sep=','):
                 except Exception as e:
                     print(f'Failed to install {package}: {e}')
                     continue
-                
-                ver = ''
-                description = ''
-                if verbose:
-                    try:
-                        ver = sep + version(package)
-                        description = metadata(package)['Summary']
-                        if description.find(sep) >= 0:
-                            description = sep + '"' + description.replace('"', "'") + '"'
-                        else:
-                            description = sep + description
-                    except:
-                        pass
 
-                for module in get_toplevels(package):
-                    score = get_score(module)
-                    of.write(f'{package}{ver}{sep}{module}{sep}{score}{description}{extra}\n')
+                if not os.path.exists(f'{site_packages}/{package}/py.typed'):
+                    print(f'Package {package} has no py.typed file; skipping')
+                else:
+                    ver = ''
+                    description = ''
+                    if verbose:
+                        try:
+                            ver = sep + version(package)
+                            description = metadata(package)['Summary']
+                            if description.find(sep) >= 0:
+                                description = sep + '"' + description.replace('"', "'") + '"'
+                            else:
+                                description = sep + description
+                        except:
+                            pass
+    
+                    for module in get_toplevels(package):
+                        score = get_score(module)
+                        of.write(f'{package}{ver}{sep}{module}{sep}{score}{description}{extra}\n')
 
                 try:
                     uninstall(package)
