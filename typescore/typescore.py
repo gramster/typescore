@@ -24,6 +24,7 @@ _skip = [
     'setuptools',
     'tomli',
     'tomli_w',
+    'typescore',
     'urllib3',
     'wheel',
     'zipp',
@@ -57,9 +58,17 @@ def get_toplevels(package) -> list[str]:
     site_packages = get_site_packages()
     loc = f'{site_packages}/{package}-*.dist-info/top_level.txt'
     files = glob.glob(loc)
+
+    # Also try using _ in place of - and vice-versa
+    if len(files) == 0 and package.find('-') >= 0:
+        loc = f'{site_packages}/{package.replace("-", "_")}-*.dist-info/top_level.txt'
+        files = glob.glob(loc)
+    if len(files) == 0 and package.find('_') >= 0:
+        loc = f'{site_packages}/{package.replace("_", "-")}-*.dist-info/top_level.txt'
+        files = glob.glob(loc)
+
     if len(files) == 1:
         with open(files[0]) as f:
-            modmap_changed = True
             modules = []
             for line in f:
                 line = line.strip()
@@ -70,6 +79,7 @@ def get_toplevels(package) -> list[str]:
                     
 
 def get_score(package: str, module: str) -> str:
+    """ Use pyright to get type coverage score for a module in a package """
     tf = f'{get_site_packages()}/{module}/py.typed'
     if not os.path.exists(tf):
         with open(tf, 'w') as f:
@@ -93,7 +103,43 @@ def get_score(package: str, module: str) -> str:
     print(f'{package}/{module}: Scoring failed: No score line found')
     return '0%'
 
-    
+ 
+def get_name_from_metadata(metadata_file):
+    with open(metadata_file) as f:
+        for line in f:
+             if line.startswith('Name:'):
+                 return line[5:].strip()
+    return None
+
+
+def cleanup(skiplist):
+    """ Remove all installed packages not in skiplist. """
+    site_packages = get_site_packages()
+    loc = f'{site_packages}/*.dist-info/METADATA'
+    files = glob.glob(loc)
+    pkgs = []
+    for file in files:
+        pkg = get_name_from_metadata(file)
+        if pkg and pkg not in skiplist:
+            pkgs.append(pkg)
+    cmd = [sys.executable, "-m", "pip", "uninstall", "-y"]
+    cmd.extend(pkgs)
+    subprocess.run(cmd, capture_output=True, check=True)
+
+
+def single_file_to_folder(site_packages, module):
+    """ Convert a module that is a single file to a folder form. """
+    os.mkdir(f'{site_packages}/{module}')
+    os.rename(f'{site_packages}/{module}.py', f'{site_packages}/{module}/__init__.py')
+
+
+def folder_to_single_file(site_packages, module):
+    """ Convert a folder module that is a single file to a top-level one. """
+    os.rename(f'{site_packages}/{module}/__init__.py',
+              f'{site_packages}/{module}.py')
+    os.rmdir(f'{site_packages}/{module}')
+ 
+
 def compute_scores(packagesfile, scorefile, verbose=True, sep=','):
     site_packages = get_site_packages()
     with open(packagesfile) as f:
@@ -127,15 +173,15 @@ def compute_scores(packagesfile, scorefile, verbose=True, sep=','):
     
                 for module in get_toplevels(package):
                     hacky = False
-                    if os.path.exists(f'{site_packages}/{module}.py'):
+                    if os.path.exists(f'{site_packages}/{module}.py') and \
+                        not os.path.exists(f'{site_packages}/{module}'):
                         # We have to do some hoop jumping here to get around
                         # pyright wanting a py.typed file before it will
                         # allow --verifytypes to be used. We already cons
                         # up a py.typed file if needed elsewhere, but we
                         # need to convert the package to a folder-based one
                         # temporarily here...
-                        os.mkdir(f'{site_packages}/{module}')
-                        os.rename(f'{site_packages}/{module}.py', f'{site_packages}/{module}/__init__.py')
+                        single_file_to_folder(site_packages, module)
                         hacky = True
                     if os.path.exists(f'{site_packages}/{module}'):
                         score = get_score(package, module)
@@ -143,12 +189,11 @@ def compute_scores(packagesfile, scorefile, verbose=True, sep=','):
                     else:
                         print(f'Package {package} module {module} not found in site packages')
                     if hacky:
-                        os.rename(f'{site_packages}/{module}/__init__.py',
-                                  f'{site_packages}/{module}.py')
-                        os.rmdir(f'{site_packages}/{module}')
+                        folder_to_single_file(site_packages, module)
                     
                 try:
-                    uninstall(package)
-                except:
-                    pass
+                    cleanup(_skip)
+                    #uninstall(package)
+                except Exception as e:
+                    print(e)
             
