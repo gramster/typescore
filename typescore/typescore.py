@@ -78,15 +78,16 @@ def get_toplevels(package) -> list[str]:
     return [package]
                     
 
-def get_score(package: str, module: str) -> str:
+def get_score(package: str, subpath: str) -> str:
     """ Use pyright to get type coverage score for a module in a package """
-    tf = f'{get_site_packages()}/{module}/py.typed'
+    tf = f'{get_site_packages()}/{subpath}/py.typed'
     if not os.path.exists(tf):
         with open(tf, 'w') as f:
             pass
     else:
         tf = None
     try:
+        module = subpath.replace('/', '.')
         s = subprocess.run([sys.executable, "-m", "pyright", "--verifytypes", module], capture_output=True, text=True)
         for line in s.stdout.split('\n'):
             l = line.strip()
@@ -127,18 +128,30 @@ def cleanup(skiplist):
     subprocess.run(cmd, capture_output=True, check=True)
 
 
-def single_file_to_folder(site_packages, module):
+def single_file_to_folder(site_packages, subpath):
     """ Convert a module that is a single file to a folder form. """
-    os.mkdir(f'{site_packages}/{module}')
-    os.rename(f'{site_packages}/{module}.py', f'{site_packages}/{module}/__init__.py')
+    os.mkdir(f'{site_packages}/{subpath}')
+    os.rename(f'{site_packages}/{subpath}.py', f'{site_packages}/{subpath}/__init__.py')
 
 
-def folder_to_single_file(site_packages, module):
+def folder_to_single_file(site_packages, subpath):
     """ Convert a folder module that is a single file to a top-level one. """
-    os.rename(f'{site_packages}/{module}/__init__.py',
-              f'{site_packages}/{module}.py')
-    os.rmdir(f'{site_packages}/{module}')
+    os.rename(f'{site_packages}/{subpath}/__init__.py',
+              f'{site_packages}/{subpath}.py')
+    os.rmdir(f'{site_packages}/{subpath}')
  
+
+def namespace_module_resolve(site_packages, package, toplevel):
+    # A real kludge to handle (some) namespace modules,
+    # because I don't want to write an import resolver 
+    # and can't think of a better simple way right now...
+    np_subpath = package.replace('-', '/')
+    if not os.path.exists(f'{site_packages}/{toplevel}/__init__.py') and \
+       package.startswith(toplevel) and package != toplevel and \
+       os.path.exists(f'{site_packages}/{np_subpath}/__init__.py'):
+       return np_subpath
+    return None
+
 
 def compute_scores(packagesfile, scorefile, verbose=True, sep=','):
     site_packages = get_site_packages()
@@ -171,29 +184,39 @@ def compute_scores(packagesfile, scorefile, verbose=True, sep=','):
                     except:
                         pass
     
-                for module in get_toplevels(package):
+                paths = get_toplevels(package)
+                if len(paths) == 1:
+                    nm_path = namespace_module_resolve(site_packages, package, paths[0])
+                    if nm_path:
+                        paths = [nm_path]
+
+                for subpath in paths:
+                    module = subpath.replace('/', '.')
                     hacky = False
-                    if os.path.exists(f'{site_packages}/{module}.py') and \
-                        not os.path.exists(f'{site_packages}/{module}'):
+                    if os.path.exists(f'{site_packages}/{subpath}.py') and \
+                        not os.path.exists(f'{site_packages}/{subpath}'):
                         # We have to do some hoop jumping here to get around
                         # pyright wanting a py.typed file before it will
                         # allow --verifytypes to be used. We already cons
                         # up a py.typed file if needed elsewhere, but we
                         # need to convert the package to a folder-based one
                         # temporarily here...
-                        single_file_to_folder(site_packages, module)
+                        single_file_to_folder(site_packages, subpath)
+                        typed = False
                         hacky = True
-                    if os.path.exists(f'{site_packages}/{module}'):
-                        score = get_score(package, module)
+                    else:
+                        typed = os.path.exists(f'{site_packages}/{subpath}/py.typed')
+
+                    if os.path.exists(f'{site_packages}/{subpath}'):
+                        score = get_score(package, subpath)
                         of.write(f'{package}{ver}{sep}{typed}{sep}{module}{sep}{score}{description}{extra}\n')
                     else:
                         print(f'Package {package} module {module} not found in site packages')
                     if hacky:
-                        folder_to_single_file(site_packages, module)
+                        folder_to_single_file(site_packages, subpath)
                     
                 try:
                     cleanup(_skip)
-                    #uninstall(package)
                 except Exception as e:
                     print(e)
             
