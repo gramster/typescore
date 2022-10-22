@@ -56,25 +56,26 @@ def get_toplevels(package) -> list[str]:
     """ Get the top-level modules associated with a package. """
     # See if there is a toplevel.txt file for the package
     site_packages = get_site_packages()
-    loc = f'{site_packages}/{package}-*.dist-info/top_level.txt'
-    files = glob.glob(loc)
-
-    # Also try using _ in place of - and vice-versa
-    if len(files) == 0 and package.find('-') >= 0:
-        loc = f'{site_packages}/{package.replace("-", "_")}-*.dist-info/top_level.txt'
+    # This would be better with regexps but we are using glob
+    for norm in [package, package.replace("-", "_"), package.replace("_", "-")]:
+        loc = f'{site_packages}/{norm}-*.dist-info'
         files = glob.glob(loc)
-    if len(files) == 0 and package.find('_') >= 0:
-        loc = f'{site_packages}/{package.replace("_", "-")}-*.dist-info/top_level.txt'
-        files = glob.glob(loc)
+        if len(files) == 1:
+            tl = f'{files[0]}/top_level.txt'
+            if os.path.exists(tl):
+                with open(tl) as f:
+                    modules = []
+                    for line in f:
+                        line = line.strip()
+                        if line:
+                            modules.append(line)
+                return modules
+            else:
+                return [norm] # dist-info has no top_level.txt; fall back to normalized package name
+        elif len(files) > 1:
+            print(f'Ambiguous dist-info file for {package}')
+            return [norm]
 
-    if len(files) == 1:
-        with open(files[0]) as f:
-            modules = []
-            for line in f:
-                line = line.strip()
-                if line:
-                    modules.append(line)
-        return modules
     return [package]
                     
 
@@ -137,7 +138,7 @@ def single_file_to_folder(site_packages, subpath):
 def folder_to_single_file(site_packages, subpath):
     """ Convert a folder module that is a single file to a top-level one. """
     os.rename(f'{site_packages}/{subpath}/__init__.py',
-              f'{site_packages}/{subpath}.py')
+              f'{site_packages}/{subpath.replace("-", "_")}.py')
     os.rmdir(f'{site_packages}/{subpath}')
  
 
@@ -193,7 +194,7 @@ def compute_scores(packagesfile, scorefile, verbose=True, sep=','):
                 for subpath in paths:
                     module = subpath.replace('/', '.')
                     hacky = False
-                    if os.path.exists(f'{site_packages}/{subpath}.py') and \
+                    if os.path.exists(f'{site_packages}/{subpath.replace("-", "_")}.py') and \
                         not os.path.exists(f'{site_packages}/{subpath}'):
                         # We have to do some hoop jumping here to get around
                         # pyright wanting a py.typed file before it will
