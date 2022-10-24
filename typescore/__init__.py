@@ -2,7 +2,7 @@
 typescore - generate typing completeness scores (and more) for a set of packages
 
 Usage:
-  typescore [--packages <packages>] [--scores <scorefile>] [--sep <sep>] [--verbose] <package>...
+  typescore [--packages <packages>] [--scores <scorefile>] [--sep <sep>] [--verbose] [<package>...]
   typescore --help
   typescore --version
 
