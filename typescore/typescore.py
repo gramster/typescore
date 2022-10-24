@@ -298,10 +298,10 @@ def compute_scores(packages: list[str]|None, packagesfile: str|None, scorefile: 
             if hacky:
                 folder_to_single_file(site_packages, subpath)
                 
-    try:
-        if of:
-            of.close()
-        cleanup(skiplist)
-    except Exception as e:
-        print(e, file=sys.stderr)
+        try:
+            cleanup(skiplist)
+        except Exception as e:
+            print(e, file=sys.stderr)
             
+    if of:
+        of.close()
