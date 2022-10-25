@@ -21,12 +21,15 @@ def get_site_packages() -> str:
 
 
 def get_stub_package(package: str) -> str | None:
-    """ See if PyPI has a package named package-stubs and if
-        so, return that. """
-    stub_package = package + '-stubs'
-    uri = f'https://pypi.org/project/{stub_package}/'
-    r = requests.get(uri, stream=True)
-    return stub_package if r.status_code == 200 else None
+    """ See if PyPI has a package that looks like it is likely type
+        stubs for package, and if so, return that. """
+
+    for stub_package in [package + '-stubs', 'types-' + package]:
+        uri = f'https://pypi.org/project/{stub_package}/'
+        r = requests.get(uri, stream=True)
+        if r.status_code == 200:
+            return stub_package
+    return None
 
 
 def get_toplevels(package: str) -> list[str]:

@@ -39,7 +39,7 @@ included in the score file output ('extra_columns'). A typical extra column
 might be the package rank on PyPI downloads.
 """
 
-__version__ = '0.8'
+__version__ = '0.9'
 
 
 from docopt import docopt
