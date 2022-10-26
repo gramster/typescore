@@ -45,4 +45,4 @@ might be the package rank on PyPI downloads.
 While it would be useful to be able to measure the coverage scores on stub packages too, pyright does not support doing so. As a result, you should evaluate whether a stub package is better than the inline types for a package yourself beffore making use of it.
 
 
-
+See latest-scores.md for results in markdown form.
