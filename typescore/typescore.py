@@ -20,18 +20,6 @@ def get_site_packages() -> str:
     return site_packages
 
 
-def get_stub_package(package: str) -> str | None:
-    """ See if PyPI has a package that looks like it is likely type
-        stubs for package, and if so, return that. """
-
-    for stub_package in [package + '-stubs', 'types-' + package]:
-        uri = f'https://pypi.org/project/{stub_package}/'
-        r = requests.get(uri, stream=True)
-        if r.status_code == 200:
-            return stub_package
-    return None
-
-
 def get_toplevels(package: str) -> list[str]:
     """ Get the top-level modules associated with a package. """
     # See if there is a toplevel.txt file for the package
@@ -197,6 +185,30 @@ def namespace_module_resolve(site_packages: str, package: str, toplevel: str) ->
     return None
 
 
+def get_stub_package(package: str) -> str | None:
+    """ See if typeshed or PyPI has a package that looks like it is likely type
+        stubs for package, and if so, return that. """
+
+    uri = f'https://github.com/python/typeshed/tree/master/stubs/{package}'
+    r = requests.get(uri, stream=True)
+    if r.status_code == 200:
+        return 'typeshed'
+
+    for stub_package in [package + '-stubs', 'types-' + package]:
+        uri = f'https://pypi.org/project/{stub_package}/'
+        r = requests.get(uri, stream=True)
+        if r.status_code == 200:
+            # Kludge to get version
+            page = r.text
+            start = page.find('<h1 class="package-header__name">')
+            if start > 0:
+                start += 33
+                end = page.find('<', start)
+                return page[start:end].strip()
+            return stub_package
+    return None
+
+
 def compute_scores(packages: list[str]|None, packagesfile: str|None, scorefile: str|None=None,
                    verbose: bool=True, sep: str=',') -> None:
     """ Read a list of packages (and extra columns) from a packagesfile,
@@ -234,6 +246,9 @@ def compute_scores(packages: list[str]|None, packagesfile: str|None, scorefile: 
 
     msg = "Can't include extra columns in package file if packages are also specified on command line; ignoring"
     for line in pkgs:
+
+        # Get package and extra columns from line
+
         parts = [p.strip() for p in line.split(sep, 1)]
         package = parts[0]
         extra = f'{sep}{parts[1]}' if len(parts) == 2 else ''
@@ -242,11 +257,16 @@ def compute_scores(packages: list[str]|None, packagesfile: str|None, scorefile: 
                 print(msg, file=sys.stderr)
                 msg = None
             extra = ''
+
+        # Install package
+
         try:
             install(package, skiplist)
         except Exception as e:
             print(f'Failed to install {package}: {e}', file=sys.stderr)
             continue
+
+        # Get attributes
 
         typed = os.path.exists(f'{site_packages}/{package}/py.typed')
         ver = ''
@@ -267,6 +287,8 @@ def compute_scores(packages: list[str]|None, packagesfile: str|None, scorefile: 
             nm_path = namespace_module_resolve(site_packages, package, paths[0])
             if nm_path:
                 paths = [nm_path]
+
+        # Iterate through toplevel modules to get scores
 
         for subpath in paths:
             module = subpath.replace('/', '.')
