@@ -1,9 +1,16 @@
 import glob
 import os
 import subprocess
+import re
 import sys
 from importlib.metadata import version, metadata
 import requests
+
+
+def normalize_name(package: str) -> str:
+    """ Normalize a package name to the folder name that would be used in site-packages. """
+    # See https://packaging.python.org/en/latest/specifications/binary-distribution-format/#escaping-and-unicode
+    return re.sub(r"[-_.]+", "_", package).lower()
 
 
 def install(package: str, skiplist: list[str]) -> None:
@@ -24,37 +31,24 @@ def get_toplevels(package: str) -> list[str]:
     """ Get the top-level modules associated with a package. """
     # See if there is a toplevel.txt file for the package
     site_packages = get_site_packages()
-    # Handle possible changes between package names on PyPI and on
-    # file system. I don't know enough yet about Python packaging to
-    # know what the deterministic solution is here (if there is one),
-    # so just try replacing '-' with '_' and vice-versa as alternates
-    # to try. A regexp solution would probably work better but we are
-    # using glob() to find files so don't have that option. I did 
-    # consider just matching against the alphabetic prefix part of
-    # the package name and then doing a second filtering pass with a
-    # regexp but it would be better to first see if there is a 
-    # deterministic algorithm here that pip uses that we can leverage
-    # before getting even more kludgy.
-    for norm in [package, package.replace("-", "_"), package.replace("_", "-")]:
-        loc = f'{site_packages}/{norm}-*.dist-info'
-        files = glob.glob(loc)
-        if len(files) == 1:
-            tl = f'{files[0]}/top_level.txt'
-            if os.path.exists(tl):
-                with open(tl) as f:
-                    modules = []
-                    for line in f:
-                        line = line.strip()
-                        if line:
-                            modules.append(line)
-                return modules
-            else:
-                return [norm] # dist-info has no top_level.txt; fall back to normalized package name
-        elif len(files) > 1: # This should probably never happen to maybe should just assert here.
-            print(f'Ambiguous dist-info file for {package}', file=sys.stderr)
-            return [norm]
-
-    return [package]
+    norm = normalize_name(package)
+    loc = f'{site_packages}/{norm}-*.dist-info'
+    files = glob.glob(loc)
+    if len(files) == 1:
+        tl = f'{files[0]}/top_level.txt'
+        if os.path.exists(tl):
+            with open(tl) as f:
+                modules = []
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        modules.append(line)
+            return modules
+        else:
+            return [norm] # dist-info has no top_level.txt; fall back to normalized package name
+    elif len(files) > 1: # This should probably never happen to maybe should just assert here.
+        print(f'Ambiguous dist-info file for {package}', file=sys.stderr)
+    return [norm]
                     
 
 def get_score(package: str, subpath: str) -> str:
@@ -131,6 +125,7 @@ def get_skiplist() -> list[str]:
         'idna',
         'importlib-metadata',
         'nodeenv',
+        'packaging',
         'pip',
         'pyright',
         'requests',
@@ -177,7 +172,7 @@ def namespace_module_resolve(site_packages: str, package: str, toplevel: str) ->
         because I don't want to write an import resolver 
         and can't think of a better simple way right now...
     """
-    np_subpath = package.replace('-', '/')
+    np_subpath = normalize_name(package.replace('-', '/'))
     if not os.path.exists(f'{site_packages}/{toplevel}/__init__.py') and \
        package.startswith(toplevel) and package != toplevel and \
        os.path.exists(f'{site_packages}/{np_subpath}/__init__.py'):
@@ -268,7 +263,8 @@ def compute_scores(packages: list[str]|None, packagesfile: str|None, scorefile: 
 
         # Get attributes
 
-        typed = os.path.exists(f'{site_packages}/{package}/py.typed')
+        cpackage = normalize_name(package)
+        typed = os.path.exists(f'{site_packages}/{cpackage}/py.typed')
         ver = ''
         description = ''
         stubs = ''
